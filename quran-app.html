@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quran Reader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            direction: ltr; /* Overall page direction */
+        }
+        .arabic-text {
+            font-size: 1.5rem; /* Larger font size for Arabic */
+            line-height: 2.5rem; /* Generous line height for readability */
+            direction: rtl; /* Arabic text direction */
+            text-align: right; /* Align text to the right */
+            font-family: 'Noto Naskh Arabic', 'Times New Roman', serif; /* Common Arabic fonts */
+        }
+        .ayah-number {
+            color: #10b981; /* Emerald-500 for ayah numbers */
+            font-size: 1rem;
+            margin-left: 0.5rem; /* Space between ayah text and number */
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col items-center pt-8 pb-16 px-4">
+
+    <div class="w-full max-w-3xl bg-white p-6 sm:p-8 rounded-xl shadow-xl">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl sm:text-4xl font-bold text-emerald-600">Quran Reader</h1>
+            <p class="text-gray-500 mt-1">Read the Holy Quran in Arabic</p>
+        </header>
+
+        <section id="search-section" class="mb-6">
+            <form id="surah-search-form" class="flex flex-col sm:flex-row gap-3">
+                <input 
+                    type="text" 
+                    id="surah-input" 
+                    placeholder="Enter Surah number or name (e.g., 1 or Al-Fatiha)" 
+                    class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-shadow"
+                >
+                <button 
+                    type="submit" 
+                    class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold p-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105"
+                >
+                    Search Surah
+                </button>
+            </form>
+        </section>
+
+        <section id="message-area" class="my-4 text-center">
+            </section>
+
+        <main id="surah-display-area" class="mt-6">
+            <div id="surah-title" class="mb-4 pb-2 border-b border-gray-200">
+                </div>
+            <div id="surah-content" class="arabic-text space-y-4 leading-loose bg-gray-50 p-4 rounded-lg shadow-inner max-h-[60vh] overflow-y-auto">
+                <p class="text-gray-400 text-center text-lg" dir="ltr">Enter a Surah number (1-114) or name to begin reading.</p>
+            </div>
+        </main>
+    </div>
+
+    <footer class="text-center text-gray-500 mt-12 text-sm">
+        <p>Quran text sourced from <a href="https://alquran.cloud/api" target="_blank" rel="noopener noreferrer" class="text-emerald-600 hover:underline">Al Quran Cloud API</a>.</p>
+        <p>App developed with ❤️</p>
+    </footer>
+
+    <script>
+        // DOM Elements
+        const surahSearchForm = document.getElementById('surah-search-form');
+        const surahInput = document.getElementById('surah-input');
+        const messageArea = document.getElementById('message-area');
+        const surahTitleDiv = document.getElementById('surah-title');
+        const surahContentDiv = document.getElementById('surah-content');
+
+        // Store for all Surah metadata
+        let allSurahsData = [];
+        const API_BASE_URL = 'https://api.alquran.cloud/v1';
+
+        // Function to display messages (info, error, success)
+        function showMessage(message, type = 'info') {
+            messageArea.innerHTML = ''; // Clear previous messages
+            const messageP = document.createElement('p');
+            messageP.textContent = message;
+            if (type === 'error') {
+                messageP.className = 'text-red-500 p-3 bg-red-100 rounded-lg';
+            } else if (type === 'success') {
+                messageP.className = 'text-green-500 p-3 bg-green-100 rounded-lg';
+            } else { // 'info' or loading
+                messageP.className = 'text-blue-500 p-3 bg-blue-100 rounded-lg';
+            }
+            messageArea.appendChild(messageP);
+        }
+
+        // Function to clear messages
+        function clearMessages() {
+            messageArea.innerHTML = '';
+        }
+        
+        // Function to clear previous Surah display
+        function clearSurahDisplay() {
+            surahTitleDiv.innerHTML = '';
+            surahContentDiv.innerHTML = `<p class="text-gray-400 text-center text-lg" dir="ltr">Enter a Surah number (1-114) or name to begin reading.</p>`;
+        }
+
+        // Fetch metadata of all Surahs on page load
+        async function fetchSurahMetadata() {
+            showMessage('Loading Surah list...', 'info');
+            try {
+                const response = await fetch(`${API_BASE_URL}/meta`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const metaData = await response.json();
+                if (metaData.data && metaData.data.surahs && metaData.data.surahs.references) {
+                    allSurahsData = metaData.data.surahs.references;
+                    showMessage('Surah list loaded. Ready to search.', 'success');
+                    // setTimeout(clearMessages, 3000); // Clear message after 3s
+                } else {
+                    throw new Error('Invalid metadata structure from API.');
+                }
+            } catch (error) {
+                console.error('Error fetching Surah metadata:', error);
+                showMessage(`Error loading Surah list: ${error.message}. Please try refreshing.`, 'error');
+                allSurahsData = []; // Ensure it's empty on error
+            }
+        }
+
+        // Handle the search form submission
+        async function handleSearch(event) {
+            event.preventDefault();
+            clearMessages();
+            const query = surahInput.value.trim();
+
+            if (!query) {
+                showMessage('Please enter a Surah number or name.', 'error');
+                return;
+            }
+            
+            if (allSurahsData.length === 0) {
+                 showMessage('Surah list is still loading or failed to load. Please wait or refresh.', 'error');
+                 return;
+            }
+
+            let surahNumberToFetch = parseInt(query, 10);
+
+            // If query is not a number, try to find by name
+            if (isNaN(surahNumberToFetch)) {
+                const foundSurah = allSurahsData.find(
+                    surah => surah.englishName.toLowerCase() === query.toLowerCase() ||
+                             surah.name.toLowerCase() === query.toLowerCase() // For Arabic name search, though less likely to be typed
+                );
+                if (foundSurah) {
+                    surahNumberToFetch = foundSurah.number;
+                } else {
+                    showMessage(`Surah "${query}" not found. Please check the name or number.`, 'error');
+                    return;
+                }
+            }
+
+            // Validate surah number range
+            if (surahNumberToFetch < 1 || surahNumberToFetch > 114) {
+                showMessage('Invalid Surah number. Please enter a number between 1 and 114.', 'error');
+                return;
+            }
+
+            await fetchAndDisplaySurah(surahNumberToFetch);
+        }
+
+        // Fetch and display a specific Surah by its number
+        async function fetchAndDisplaySurah(surahNumber) {
+            showMessage(`Loading Surah ${surahNumber}...`, 'info');
+            surahTitleDiv.innerHTML = '';
+            surahContentDiv.innerHTML = ''; // Clear previous content
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/surah/${surahNumber}`);
+                if (!response.ok) {
+                    if (response.status === 404) throw new Error('Surah not found on API.');
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const surahDataResponse = await response.json();
+                
+                if (surahDataResponse.code === 200 && surahDataResponse.data) {
+                    displaySurah(surahDataResponse.data);
+                    clearMessages(); // Clear loading message
+                } else {
+                    throw new Error(surahDataResponse.message || 'Failed to fetch Surah data.');
+                }
+
+            } catch (error) {
+                console.error('Error fetching Surah:', error);
+                showMessage(`Error loading Surah: ${error.message}`, 'error');
+                clearSurahDisplay(); // Clear display on error
+            }
+        }
+
+        // Display the fetched Surah data
+        function displaySurah(surah) {
+            // Display Surah title
+            const titleHeader = document.createElement('h2');
+            titleHeader.className = 'text-2xl font-semibold text-emerald-700 mb-1 text-center';
+            titleHeader.textContent = `${surah.englishName} - ${surah.name}`;
+            
+            const subTitle = document.createElement('p');
+            subTitle.className = 'text-gray-500 text-sm text-center';
+            subTitle.textContent = `Surah No: ${surah.number} | Ayahs: ${surah.numberOfAyahs} | Revelation: ${surah.revelationType}`;
+            
+            surahTitleDiv.appendChild(titleHeader);
+            surahTitleDiv.appendChild(subTitle);
+
+            // Display Surah content (ayahs)
+            surahContentDiv.innerHTML = ''; // Clear previous content or placeholder
+
+            surah.ayahs.forEach(ayah => {
+                const ayahP = document.createElement('p');
+                ayahP.className = 'mb-2'; // Add some margin between ayahs
+
+                const ayahTextSpan = document.createElement('span');
+                ayahTextSpan.textContent = ayah.text;
+                
+                const ayahNumberSpan = document.createElement('span');
+                ayahNumberSpan.className = 'ayah-number';
+                // Convert numbers to Eastern Arabic numerals
+                ayahNumberSpan.textContent = ` (${ayah.numberInSurah.toLocaleString('ar-EG')})`; 
+                
+                ayahP.appendChild(ayahTextSpan);
+                ayahP.appendChild(ayahNumberSpan);
+                surahContentDiv.appendChild(ayahP);
+            });
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchSurahMetadata(); // Load all Surah names and numbers
+            surahSearchForm.addEventListener('submit', handleSearch);
+            
+            // Set initial placeholder if metadata is not yet loaded
+            if(allSurahsData.length === 0) {
+                 surahContentDiv.innerHTML = `<p class="text-gray-400 text-center text-lg" dir="ltr">Surah will appear here</p>`;
+            }
+        });
+
+    </script>
+</body>
+</html>
